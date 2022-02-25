@@ -3,10 +3,8 @@
 data generation for DLA
 
 ```python
-Version: 0.0.2     
-Authors: Md. Nazmuddoha Ansary,
-         Md. Rezwanul Haque,
-         Md. Mobassir Hossain 
+Version: 0.0.1     
+Authors: Md. Nazmuddoha Ansary
 ```
 
 **LOCAL ENVIRONMENT**  
