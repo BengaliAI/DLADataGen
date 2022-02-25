@@ -7,3 +7,5 @@ class config:
     min_word_in_line    =   5 
     max_line_in_para    =   20
     min_line_in_para    =   5 
+    bangla_font_dir     = './fonts/Bangla.ttf'
+    bangla_word_40_dir  = './dataset/BengaliWordList_40.txt'

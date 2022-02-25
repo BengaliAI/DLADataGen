@@ -8,6 +8,11 @@
 
 from .config import config
 import random
+import PIL
+import numpy as np
+import cv2
+import textwrap
+
 class english:
     iden = "english"
     lower= ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
@@ -216,6 +221,23 @@ class bangla:
     valid                    =    ['']+sorted(dict_graphemes+numbers+punctuations)
 
 
+class banglaWord:
+    iden                   =    "banglaWord"
+    numbers                =    ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯']
+    punctuations           =    ['!', '"', '#', '$', '%', '&', "'", '(', ')', '*', '+', ',', '-', '.', 
+                                 '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`',
+                                 '{', '|', '}', '~', '।']
+    
+    with open(config.bangla_word_40_dir, 'r') as infile:
+        data = infile.readlines()
+        dict_bangla_word   =    []
+        for i in data:
+            lst = i.split()
+            dict_bangla_word.append(lst[0])
+            
+    valid                  =    ['']+sorted(dict_bangla_word+numbers+punctuations)
+    
+
 #----------------------------------------- add all language info-------------------------------------------------------------
 languages={}
 languages["bangla"]=bangla
@@ -265,4 +287,201 @@ def generate_single_line_text_by_lenght(valid,length):
     line=" ".join(words)
     return line
 
-# TODO: Date function wrapper
+################ TODO: Date function wrapper ################ 
+
+def get_font(font_dir, _h):
+    '''
+        get font with size
+    '''
+    font=PIL.ImageFont.truetype(font_dir, _h)
+    return font
+
+def insert_spaces(_graphemes):
+    '''
+        arg:
+            * _graphemes = 1-D list.
+    '''
+    # error check -- type
+    assert type(_graphemes)==list,"graphems: 1-D list"
+    for i in range(len(_graphemes)-1):
+        while random.randrange(2):
+            _graphemes[i] = _graphemes[i] + ' '
+    return _graphemes
+
+def add_spaces(s, num_spaces):
+    '''
+        randomly add space
+    '''
+    assert(num_spaces <= len(s) - 1)
+
+    space_idx = []
+    space_idx.append(random.randint(0, len(s) - 2))
+    num_spaces -= 1
+
+    while (num_spaces > 0):
+        idx = random.randint(0, len(s) - 2)
+        if (not idx in space_idx):
+            space_idx.append(idx)
+            num_spaces -= 1
+
+    result_with_spaces = ''
+    for i in range(len(s)):
+        result_with_spaces += s[i]
+        if i in space_idx:
+            result_with_spaces += ' '
+
+    return result_with_spaces
+
+def get_bangla_random_word_space(len_word):
+    '''
+        get random word with adding space
+    '''
+    _graphemes=[]
+    for i in range(len_word):
+        _graphemes.append(random.choice(bangla.valid))
+
+    rand_dest = 5
+    if len_word<10:
+        rand_dest=0
+    elif 10<=len_word<=100:
+        rand_dest=3
+    elif len_word>100:
+        rand_dest=10
+    _graphemes = add_spaces(_graphemes,random.randint(1,rand_dest))
+    return "".join(_graphemes)
+
+def get_bangla_random_word(len_word):
+    '''
+        get random word and add space after 5 graphemes
+    '''
+    _graphemes=[]
+    for i in range(len_word):
+        _graphemes.append(random.choice(bangla.valid))
+        if i%5 == 0 and i>1:
+            _graphemes.append(' ')
+    return "".join(_graphemes)
+
+
+def get_bangla_random_word_list(len_word):
+    '''
+        get random word and add space after 5 graphemes
+    '''
+    _graphemes=[]
+    for i in range(len_word):
+        _graphemes.append(random.choice(banglaWord.valid))
+        _graphemes.append(' ')
+    # return "".join(_graphemes)
+    return _graphemes
+
+def create_word_image(len_word, _w, _h):
+    '''
+        create a word image from grapheme
+    '''
+    if _w < 100 or _h < 10:
+        text=get_bangla_random_word(len_word)
+    else:
+        text=get_bangla_random_word_list(len_word)
+    print(text)
+    text = "".join(text)
+
+    image = PIL.Image.new(mode='L', size=(_w, _h))
+
+    draw = PIL.ImageDraw.Draw(image)
+    draw.text(xy=(0, 0), text=text, fill=255, font=get_font(config.bangla_font_dir, _h))
+    # reverse
+    img=np.array(image)
+    idx=np.where(img>0)
+    y_min,y_max,x_min,x_max = np.min(idx[0]), np.max(idx[0]), np.min(idx[1]), np.max(idx[1])
+    img=img[y_min:y_max,x_min:x_max]
+    img=255-img
+    img=cv2.merge((img,img,img))
+    return img
+
+def break_fix(text, width, font, draw):
+
+    if not text:
+        return
+    lo = 0
+    hi = len(text)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        t = text[:mid]
+        _t = "".join(t)
+        w, h = draw.textsize(_t, font=font)
+        if w <= width:
+            lo = mid
+        else:
+            hi = mid - 1
+    t = text[:lo]
+    _t = "".join(t)
+    w, h = draw.textsize(_t, font=font)
+    yield t, w, h
+    yield from break_fix(text[lo:], width, font, draw)
+
+def fit_text(_w, _h, color, font_dir, font_size):
+    '''
+        fit text within a box (width, height)
+    '''
+    img = PIL.Image.new('RGB', (_w, _h), color='white')
+    font = PIL.ImageFont.truetype(font_dir, font_size)
+    width = img.size[0] 
+    draw = PIL.ImageDraw.Draw(img)
+
+    _middle = 10
+    tmp = int(_middle//10)
+    cnt = 0
+    c=0
+    while True:
+        if _w < 100 or _h < 10:
+            text = get_bangla_random_word(_middle)
+        else:
+            text = get_bangla_random_word_list(_middle)
+        pieces = list(break_fix(text, width, font, draw))
+        height = sum(p[2] for p in pieces)
+
+        if height > img.size[1]:
+            _middle = _middle - 1
+        elif height < img.size[1]:
+            _middle = _middle + 1
+        elif _middle <= 3:
+            _middle = tmp
+            c=0
+        else:
+            break
+            
+        cnt += 1
+        if cnt%100==0 and _middle > 0:
+            c += 1
+            print("len of bn text: ", _middle)
+            if c > 3 or height <= img.size[1]:
+                print("Height: -- ", height)
+                break
+            
+    y = (img.size[1] - height) // 2
+    for t, w, h in pieces:
+        x = (img.size[0] - w) // 2
+        _t = "".join(t)
+        draw.text((x, y), _t, font=font, fill=color)
+        y += h
+    return img
+
+
+def draw_multiple_line_text(text, _w, _h, text_color, fontsize, char_numbers):
+    '''
+    From unutbu on [python PIL draw multiline text on image](https://stackoverflow.com/a/7698300/395857)
+    '''
+    font = PIL.ImageFont.truetype(config.bangla_font_dir, fontsize)
+    image = PIL.Image.new('RGB', (_w, _h), color='white')
+    draw = PIL.ImageDraw.Draw(image)
+    image_width, image_height = image.size
+    y_text = 0
+    lines = textwrap.wrap(text, width=char_numbers)
+    for line in lines:
+        line_width, line_height = font.getsize(line)
+        draw.text(((image_width - line_width) / 2, y_text), 
+                  line, font=font, fill=text_color)
+        y_text += line_height
+
+    return image
+
+    
