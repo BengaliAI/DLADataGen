@@ -1,5 +1,6 @@
-# apsis-nid-ocr
-NID OCR Detection,Recognition and Segmentation Dataset 
+# DLADataGen
+
+data generation for DLA
 
 ```python
 Version: 0.0.2     
